@@ -1,119 +1,136 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "lib/openzeppelin-contracts/contracts/token/ERC721/ERC721.sol";
-import "lib/openzeppelin-contracts/contracts/access/Ownable.sol";
-import "lib/openzeppelin-contracts/contracts/utils/structs/EnumerableMap.sol";
+import "solmate/tokens/ERC721.sol";
+import {SignUtils} from "./libraries/SignUtils.sol";
 
-contract NFTMarket is ERC721{
- 
- uint256 public tokenId;
- uint256 public counter = 1; 
-
-    struct Order {
-        address tokenOwner;
-        address tokenAddress;
+contract NFTMarket {
+    struct Listing {
+        address token;
         uint256 tokenId;
         uint256 price;
-        bool isActive;
-        uint256 deadline;
-        bytes signature;
-    }
-        mapping(bytes32 => Order) public orders;
-
-         modifier onlyTokenOwner(address tokenAddress, uint256 _tokenId) {
-        require(
-            IERC721(tokenAddress).ownerOf(tokenId) == msg.sender,
-            "Not the token owner"
-        );
-        _;
+        bytes sig;
+        // Slot 4
+        uint88 deadline;
+        address lister;
+        bool active;
     }
 
-   function createOrder(
-    address tokenAddress,
-    uint256 _tokenId,
-    uint256 price,
-    uint256 deadline,
-    bytes memory signature
-) external onlyTokenOwner(tokenAddress, tokenId) {
-    require(tokenAddress != address(0), "Invalid token address");
-    require(price > 0, "Price must be greater than 0");
-    require(deadline > block.timestamp, "Invalid deadline");
+    mapping(uint256 => Listing) public listings;
+    address public admin;
+    uint256 public listingId;
 
-  
-    uint256 order = Order();
+    /* ERRORS */
+    error NotOwner();
+    error NotApproved();
+    // error AddressZero();
+    // error NoCode();
+    error MinPriceTooLow();
+    error DeadlineTooSoon();
+    error MinDurationNotMet();
+    error InvalidSignature();
+    error ListingNotExistent();
+    error ListingNotActive();
+    error PriceNotMet(int256 difference);
+    error ListingExpired();
+    error PriceMismatch(uint256 originalPrice);
 
-    require(IERC721(tokenAddress).ownerOf(tokenId) == msg.sender, "Not the token owner");
+    /* EVENTS */
+    event ListingCreated(uint256 indexed listingId, Listing);
+    event ListingExecuted(uint256 indexed listingId, Listing);
+    event ListingEdited(uint256 indexed listingId, Listing);
 
-    bytes32 orderHash = Orders(msg.sender, tokenAddress, tokenId, price, deadline);
+    constructor() {
+        admin = msg.sender;
+    }
 
-    // Verify the signature
+    function createListing(Listing calldata l) public returns (uint256 lId) {
+        if (ERC721(l.token).ownerOf(l.tokenId) != msg.sender)
+            revert NotApproved();
+        if (!ERC721(l.token).isApprovedForAll(msg.sender, address(this)))
+            revert NotApproved();
+        // if (l.token == address(0)) revert AddressZero();
+        // if (l.token.code.length == 0) revert NoCode();
+        if (l.price < 0.01 ether) revert MinPriceTooLow();
+        if (l.deadline < block.timestamp) revert DeadlineTooSoon();
+        if (l.deadline - block.timestamp < 60 minutes)
+            revert MinDurationNotMet();
 
-    require(signature.recover(orderHash) == msg.sender, "Invalid signature");
-
-     bytes32 createOrder = keccak256(
-        abi.encodePacked(
-            msg.sender,
-            tokenAddress,
-            tokenId,
-            price,
-            deadline
-        )
-    );
-       Order();
-       emit createOrder(orders, msg.sender, tokenAddress, tokenId, price, deadline);
-}
-
-    function executeOrder(
-        address tokenAddress,
-        uint256 _tokenId,
-        uint256 price,
-        uint256 deadline,
-        bytes memory signature,
-        uint256 executeOrderId
-    ) external payable onlyTokenOwner(
-        keccak256(
-            abi.encodePacked(
-                msg.sender,
-                tokenAddress,
-                tokenId,
-                price,
-                deadline
+        // Assert signature
+        if (
+            SignUtils.isValid(
+                SignUtils.constructMessageHash(
+                    l.token,
+                    l.tokenId,
+                    l.price,
+                    l.deadline,
+                    l.lister
+                ),
+                l.sig,
+                msg.sender
             )
-        )
-    ) {
-        bytes32 orderHash = keccak256(
-            abi.encodePacked(
-                msg.sender,
-                tokenAddress,
-                tokenId,
-                price,
-                deadline
-            )
-        );
-            // retrieve order bsed on hash
-        Order storage order = orders[orderHash];
+        ) revert InvalidSignature();
 
-        //Ether transfer
-        address seller = order.tokenOwner;
-        require(msg.value >= order.price, "Insufficient funds");
-        (bool transferSuccess, ) = seller.call{value: order.price}("");
-        require(transferSuccess, "Ether transfer failed");
+        // append to Storage
+        Listing storage li = listings[listingId];
+        li.token = l.token;
+        li.tokenId = l.tokenId;
+        li.price = l.price;
+        li.sig = l.sig;
+        li.deadline = uint88(l.deadline);
+        li.lister = msg.sender;
+        li.active = true;
 
-        //transfer NFT
-        IERC721(order.tokenAddress).safeTransferFrom(seller, msg.sender, order.tokenId);
+        // Emit event
+        emit ListingCreated(listingId, l);
+        lId = listingId;
+        listingId++;
+        return lId;
+    }
 
-        counter++;
+    function executeListing(uint256 _listingId) public payable {
+        if (_listingId >= listingId) revert ListingNotExistent();
+        Listing storage listing = listings[_listingId];
+        if (listing.deadline < block.timestamp) revert ListingExpired();
+        if (!listing.active) revert ListingNotActive();
+        if (listing.price != msg.value)
+            revert PriceNotMet(int256(listing.price) - int256(msg.value));
 
-          emit executeOrderId(
-            executeOrderId,
-            order.tokenOwner,
+        // Update state
+        listing.active = false;
+
+        // transfer
+        ERC721(listing.token).transferFrom(
+            listing.lister,
             msg.sender,
-            order.tokenAddress,
-            order.tokenId,
-            order.price
+            listing.tokenId
         );
 
+        // transfer eth
+        payable(listing.lister).transfer(listing.price);
 
-}
+        // Update storage
+        emit ListingExecuted(_listingId, listing);
+    }
+
+    function editListing(
+        uint256 _listingId,
+        uint256 _newPrice,
+        bool _active
+    ) public {
+        if (_listingId >= listingId) revert ListingNotExistent();
+        Listing storage listing = listings[_listingId];
+        if (listing.lister != msg.sender) revert NotOwner();
+        listing.price = _newPrice;
+        listing.active = _active;
+        emit ListingEdited(_listingId, listing);
+    }
+
+    // add getter for listing
+    function getListing(
+        uint256 _listingId
+    ) public view returns (Listing memory) {
+        // if (_listingId >= listingId)
+        return listings[_listingId];
+    }
 }
