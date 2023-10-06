@@ -5,7 +5,7 @@ import {NFTMarket} from "../src/NFTMarket.sol";
 import "../src/ERC721Mock.sol";
 import "./Helpers.sol";
 
-contract MarketPlaceTest is Helpers {
+contract NFTMarketTest is Helpers {
     NFTMarket mPlace;
     OurNFT nft;
 
@@ -40,7 +40,7 @@ contract MarketPlaceTest is Helpers {
         nft.mint(userA, 1);
     }
 
-    function testOwnerCannotCreateListing() public {
+    function testOwnerNotCreateListing() public {
         l.lister = userB;
         switchSigner(userB);
 
@@ -62,7 +62,7 @@ contract MarketPlaceTest is Helpers {
         mPlace.createListing(l);
     }*/
 
-    function testMinPriceTooLow() public {
+    function testMinPrice() public {
         switchSigner(userA);
         nft.setApprovalForAll(address(mPlace), true);
         l.price = 0;
@@ -77,7 +77,7 @@ contract MarketPlaceTest is Helpers {
         mPlace.createListing(l);
     }
 
-    function testMinDuration() public {
+    function testNotMetDuration() public {
         switchSigner(userA);
         nft.setApprovalForAll(address(mPlace), true);
         l.deadline = uint88(block.timestamp + 59 minutes);
@@ -85,7 +85,7 @@ contract MarketPlaceTest is Helpers {
         mPlace.createListing(l);
     }
 
-    function testValidSig() public {
+    function testValidSignature() public {
         switchSigner(userA);
         nft.setApprovalForAll(address(mPlace), true);
         l.deadline = uint88(block.timestamp + 120 minutes);

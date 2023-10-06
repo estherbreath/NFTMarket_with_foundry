@@ -1,30 +1,28 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
+// import "solmate/tokens/ERC721.sol";
 import "solmate/tokens/ERC721.sol";
 import {SignUtils} from "./libraries/SignUtils.sol";
 
 contract NFTMarket {
-    struct Listing {
-        address token;
+    struct ListingData {
+        address tokenAddress;
         uint256 tokenId;
-        uint256 price;
-        bytes sig;
-        // Slot 4
-        uint88 deadline;
-        address lister;
-        bool active;
+        uint256 priceInWei;
+        bytes signature;
+        uint88 expiryTime;
+        address listerAddress;
+        bool isActive;
     }
 
-    mapping(uint256 => Listing) public listings;
-    address public admin;
-    uint256 public listingId;
+    mapping(uint256 => ListingData) public customListings;
+    address public customAdmin;
+    uint256 public customListingId;
 
     /* ERRORS */
     error NotOwner();
     error NotApproved();
-    // error AddressZero();
-    // error NoCode();
     error MinPriceTooLow();
     error DeadlineTooSoon();
     error MinDurationNotMet();
@@ -36,101 +34,98 @@ contract NFTMarket {
     error PriceMismatch(uint256 originalPrice);
 
     /* EVENTS */
-    event ListingCreated(uint256 indexed listingId, Listing);
-    event ListingExecuted(uint256 indexed listingId, Listing);
-    event ListingEdited(uint256 indexed listingId, Listing);
+    event CustomListingCreated(uint256 indexed listingId, ListingData);
+    event CustomListingExecuted(uint256 indexed listingId, ListingData);
+    event CustomListingEdited(uint256 indexed listingId, ListingData);
 
     constructor() {
-        admin = msg.sender;
+        customAdmin = msg.sender;
     }
 
-    function createListing(Listing calldata l) public returns (uint256 lId) {
-        if (ERC721(l.token).ownerOf(l.tokenId) != msg.sender)
+    function createCustomListing(ListingData calldata listing) public returns (uint256 listingId) {
+        if (ERC721(listing.tokenAddress).ownerOf(listing.tokenId) != msg.sender)
             revert NotApproved();
-        if (!ERC721(l.token).isApprovedForAll(msg.sender, address(this)))
+        if (!ERC721(listing.tokenAddress).isApprovedForAll(msg.sender, address(this)))
             revert NotApproved();
-        // if (l.token == address(0)) revert AddressZero();
-        // if (l.token.code.length == 0) revert NoCode();
-        if (l.price < 0.01 ether) revert MinPriceTooLow();
-        if (l.deadline < block.timestamp) revert DeadlineTooSoon();
-        if (l.deadline - block.timestamp < 60 minutes)
+        if (listing.priceInWei < 0.01 ether) revert MinPriceTooLow();
+        if (listing.expiryTime < block.timestamp) revert DeadlineTooSoon();
+        if (listing.expiryTime - block.timestamp < 60 minutes)
             revert MinDurationNotMet();
 
         // Assert signature
         if (
             SignUtils.isValid(
                 SignUtils.constructMessageHash(
-                    l.token,
-                    l.tokenId,
-                    l.price,
-                    l.deadline,
-                    l.lister
+                    listing.tokenAddress,
+                    listing.tokenId,
+                    listing.priceInWei,
+                    listing.expiryTime,
+                    listing.listerAddress
                 ),
-                l.sig,
+                listing.signature,
                 msg.sender
             )
         ) revert InvalidSignature();
 
         // append to Storage
-        Listing storage li = listings[listingId];
-        li.token = l.token;
-        li.tokenId = l.tokenId;
-        li.price = l.price;
-        li.sig = l.sig;
-        li.deadline = uint88(l.deadline);
-        li.lister = msg.sender;
-        li.active = true;
+        ListingData storage customListing = customListings[customListingId];
+        customListing.tokenAddress = listing.tokenAddress;
+        customListing.tokenId = listing.tokenId;
+        customListing.priceInWei = listing.priceInWei;
+        customListing.signature = listing.signature;
+        customListing.expiryTime = uint88(listing.expiryTime);
+        customListing.listerAddress = msg.sender;
+        customListing.isActive = true;
 
         // Emit event
-        emit ListingCreated(listingId, l);
-        lId = listingId;
-        listingId++;
-        return lId;
+        emit CustomListingCreated(customListingId, listing);
+        listingId = customListingId;
+        customListingId++;
+        return listingId;
     }
 
-    function executeListing(uint256 _listingId) public payable {
-        if (_listingId >= listingId) revert ListingNotExistent();
-        Listing storage listing = listings[_listingId];
-        if (listing.deadline < block.timestamp) revert ListingExpired();
-        if (!listing.active) revert ListingNotActive();
-        if (listing.price != msg.value)
-            revert PriceNotMet(int256(listing.price) - int256(msg.value));
+    function executeCustomListing(uint256 listingId) public payable {
+        if (listingId >= customListingId) revert ListingNotExistent();
+        ListingData storage customListing = customListings[listingId];
+        if (customListing.expiryTime < block.timestamp) revert ListingExpired();
+        if (!customListing.isActive) revert ListingNotActive();
+        if (customListing.priceInWei != msg.value)
+            revert PriceNotMet(int256(customListing.priceInWei) - int256(msg.value));
 
         // Update state
-        listing.active = false;
+        customListing.isActive = false;
 
         // transfer
-        ERC721(listing.token).transferFrom(
-            listing.lister,
+        ERC721(customListing.tokenAddress).transferFrom(
+            customListing.listerAddress,
             msg.sender,
-            listing.tokenId
+            customListing.tokenId
         );
 
         // transfer eth
-        payable(listing.lister).transfer(listing.price);
+        payable(customListing.listerAddress).transfer(customListing.priceInWei);
 
         // Update storage
-        emit ListingExecuted(_listingId, listing);
+        emit CustomListingExecuted(listingId, customListing);
     }
 
-    function editListing(
-        uint256 _listingId,
-        uint256 _newPrice,
-        bool _active
+    function editCustomListing(
+        uint256 listingId,
+        uint256 newPrice,
+        bool isActive
     ) public {
-        if (_listingId >= listingId) revert ListingNotExistent();
-        Listing storage listing = listings[_listingId];
-        if (listing.lister != msg.sender) revert NotOwner();
-        listing.price = _newPrice;
-        listing.active = _active;
-        emit ListingEdited(_listingId, listing);
+        if (listingId >= customListingId) revert ListingNotExistent();
+        ListingData storage customListing = customListings[listingId];
+        if (customListing.listerAddress != msg.sender) revert NotOwner();
+        customListing.priceInWei = newPrice;
+        customListing.isActive = isActive;
+        emit CustomListingEdited(listingId, customListing);
     }
 
     // add getter for listing
-    function getListing(
-        uint256 _listingId
-    ) public view returns (Listing memory) {
-        // if (_listingId >= listingId)
-        return listings[_listingId];
+    function getCustomListing(
+        uint256 listingId
+    ) public view returns (ListingData memory) {
+        return customListings[listingId];
     }
 }
