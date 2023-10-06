@@ -2,7 +2,7 @@
 pragma solidity ^0.8.13;
 
 // import "solmate/tokens/ERC721.sol";
-import "solmate/tokens/ERC721.sol";
+import "openzeppelin/token/ERC721/ERC721.sol";
 import {SignUtils} from "./libraries/SignUtils.sol";
 
 contract NFTMarket {

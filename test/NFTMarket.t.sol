@@ -17,7 +17,7 @@ contract NFTMarketTest is Helpers {
     uint256 privKeyA;
     uint256 privKeyB;
 
-    NFTMarket.Listing l;
+    NFTMarket.ListingData l;
 
     function setUp() public {
         mPlace = new NFTMarket();
@@ -53,14 +53,6 @@ contract NFTMarketTest is Helpers {
         vm.expectRevert(NFTMarket.NotApproved.selector);
         mPlace.createListing(l);
     }
-
-    /*function testNonAddressZero() public {
-        switchSigner(userA);
-        nft.setApprovalForAll(address(mPlace), true);
-        l.token = address(0);
-        vm.expectRevert(NFTMarket.AddressZero.selector);
-        mPlace.createListing(l);
-    }*/
 
     function testMinPrice() public {
         switchSigner(userA);
@@ -141,7 +133,7 @@ contract NFTMarketTest is Helpers {
         uint256 lId = mPlace.createListing(l);
         mPlace.editListing(lId, 0.01 ether, false);
 
-       NFTMarket.Listing memory t = mPlace.getListing(lId);
+       NFTMarket.ListingData memory t = mPlace.getListing(lId);
         assertEq(t.price, 0.01 ether);
         assertEq(t.active, false);
     }
@@ -240,7 +232,7 @@ contract NFTMarketTest is Helpers {
 
         mPlace.executeListing{value: l.price}(lId);
 
-       NFTMarket.Listing memory t = mPlace.getListing(lId);
+       NFTMarket.ListingData memory t = mPlace.getListing(lId);
         assertEq(t.price, 0.01 ether);
         assertEq(t.active, false);
 
