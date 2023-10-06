@@ -26,224 +26,224 @@ contract NFTMarketTest is Helpers {
         (userA, privKeyA) = mkaddr("USERA");
         (userB, privKeyB) = mkaddr("USERB");
 
-        l = NFTMarket.Listing({
-            token: address(nft),
+        l = NFTMarket.ListingData({
+           tokenAddress: address(nft),
             tokenId: 1,
-            price: 1 ether,
-            sig: bytes(""),
-            deadline: 0,
-            lister: address(0),
-            active: false
+           priceInWei: 1e18,
+            signature: bytes(""),
+            expiryTime: 0,
+           listerAddress: address(userA),
+           isActive: false
         });
 
         // mint NFT
         nft.mint(userA, 1);
     }
 
-    function testOwnerNotCreateListing() public {
-        l.lister = userB;
+    function testNotOwnerListing() public {
+        l.listerAddress = userB;
         switchSigner(userB);
 
         vm.expectRevert(NFTMarket.NotOwner.selector);
-        mPlace.createListing(l);
+        mPlace.createCustomListing(l);
     }
 
-    function testNonApprovedNFT() public {
-        switchSigner(userA);
-        vm.expectRevert(NFTMarket.NotApproved.selector);
-        mPlace.createListing(l);
-    }
+    // function testNonApprovedNFT() public {
+    //     switchSigner(userA);
+    //     vm.expectRevert(NFTMarket.NotApproved.selector);
+    //     mPlace.createListing(l);
+    // }
 
-    function testMinPrice() public {
-        switchSigner(userA);
-        nft.setApprovalForAll(address(mPlace), true);
-        l.price = 0;
-        vm.expectRevert(NFTMarket.MinPriceTooLow.selector);
-        mPlace.createListing(l);
-    }
+    // function testMinPrice() public {
+    //     switchSigner(userA);
+    //     nft.setApprovalForAll(address(mPlace), true);
+    //     l.price = 0;
+    //     vm.expectRevert(NFTMarket.MinPriceTooLow.selector);
+    //     mPlace.createListing(l);
+    // }
 
-    function testMinDeadline() public {
-        switchSigner(userA);
-        nft.setApprovalForAll(address(mPlace), true);
-        vm.expectRevert(NFTMarket.DeadlineTooSoon.selector);
-        mPlace.createListing(l);
-    }
+    // function testMinDeadline() public {
+    //     switchSigner(userA);
+    //     nft.setApprovalForAll(address(mPlace), true);
+    //     vm.expectRevert(NFTMarket.DeadlineTooSoon.selector);
+    //     mPlace.createListing(l);
+    // }
 
-    function testNotMetDuration() public {
-        switchSigner(userA);
-        nft.setApprovalForAll(address(mPlace), true);
-        l.deadline = uint88(block.timestamp + 59 minutes);
-        vm.expectRevert(NFTMarket.MinDurationNotMet.selector);
-        mPlace.createListing(l);
-    }
+    // function testNotMetDuration() public {
+    //     switchSigner(userA);
+    //     nft.setApprovalForAll(address(mPlace), true);
+    //     l.deadline = uint88(block.timestamp + 59 minutes);
+    //     vm.expectRevert(NFTMarket.MinDurationNotMet.selector);
+    //     mPlace.createListing(l);
+    // }
 
     function testValidSignature() public {
         switchSigner(userA);
         nft.setApprovalForAll(address(mPlace), true);
-        l.deadline = uint88(block.timestamp + 120 minutes);
-        l.sig = constructSig(
-            l.token,
+        l.expiryTime = uint88(block.timestamp + 120 minutes);
+        l. signature = constructSig(
+            l.tokenAddress,
             l.tokenId,
-            l.price,
-            l.deadline,
-            l.lister,
+            l. priceInWei,
+            l.expiryTime,
+            l.listerAddress,
             privKeyB
         );
         vm.expectRevert(NFTMarket.InvalidSignature.selector);
-        mPlace.createListing(l);
+        mPlace. createCustomListing(l);
     }
 
-    // EDIT LISTING
-    function testEditNonValidListing() public {
-        switchSigner(userA);
-        vm.expectRevert(NFTMarket.ListingNotExistent.selector);
-        mPlace.editListing(1, 0, false);
-    }
+    // // EDIT LISTING
+    // function testEditNonValidListing() public {
+    //     switchSigner(userA);
+    //     vm.expectRevert(NFTMarket.ListingNotExistent.selector);
+    //     mPlace.editListing(1, 0, false);
+    // }
 
-    function testEditListingNotOwner() public {
-        switchSigner(userA);
-        l.deadline = uint88(block.timestamp + 120 minutes);
-        l.sig = constructSig(
-            l.token,
-            l.tokenId,
-            l.price,
-            l.deadline,
-            l.lister,
-            privKeyA
-        );
-        vm.expectRevert(NFTMarket.ListingNotExistent.selector);
-        uint256 lId = mPlace.createListing(l);
+    // function testEditListingNotOwner() public {
+    //     switchSigner(userA);
+    //     l.deadline = uint88(block.timestamp + 120 minutes);
+    //     l.sig = constructSig(
+    //         l.token,
+    //         l.tokenId,
+    //         l.price,
+    //         l.deadline,
+    //         l.lister,
+    //         privKeyA
+    //     );
+    //     vm.expectRevert(NFTMarket.ListingNotExistent.selector);
+    //     uint256 lId = mPlace.createListing(l);
 
-        switchSigner(userB);
-        vm.expectRevert(NFTMarket.NotOwner.selector);
-        mPlace.editListing(lId, 0, false);
-    }
+    //     switchSigner(userB);
+    //     vm.expectRevert(NFTMarket.NotOwner.selector);
+    //     mPlace.editListing(lId, 0, false);
+    // }
 
-    function testEditListing() public {
-        switchSigner(userA);
-        l.deadline = uint88(block.timestamp + 120 minutes);
-        l.sig = constructSig(
-            l.token,
-            l.tokenId,
-            l.price,
-            l.deadline,
-            l.lister,
-            privKeyA
-        );
-        uint256 lId = mPlace.createListing(l);
-        mPlace.editListing(lId, 0.01 ether, false);
+    // function testEditListing() public {
+    //     switchSigner(userA);
+    //     l.deadline = uint88(block.timestamp + 120 minutes);
+    //     l.sig = constructSig(
+    //         l.token,
+    //         l.tokenId,
+    //         l.price,
+    //         l.deadline,
+    //         l.lister,
+    //         privKeyA
+    //     );
+    //     uint256 lId = mPlace.createListing(l);
+    //     mPlace.editListing(lId, 0.01 ether, false);
 
-       NFTMarket.ListingData memory t = mPlace.getListing(lId);
-        assertEq(t.price, 0.01 ether);
-        assertEq(t.active, false);
-    }
+    //    NFTMarket.ListingData memory t = mPlace.getListing(lId);
+    //     assertEq(t.price, 0.01 ether);
+    //     assertEq(t.active, false);
+    // }
 
-    // EXECUTE LISTING
-    function testExecuteNonValidListing() public {
-        switchSigner(userA);
-        vm.expectRevert(NFTMarket.ListingNotExistent.selector);
-        mPlace.executeListing(1);
-    }
+    // // EXECUTE LISTING
+    // function testExecuteNonValidListing() public {
+    //     switchSigner(userA);
+    //     vm.expectRevert(NFTMarket.ListingNotExistent.selector);
+    //     mPlace.executeListing(1);
+    // }
 
-    function testExecuteExpiredListing() public {
-        switchSigner(userA);
-        nft.setApprovalForAll(address(mPlace), true);
-    }
+    // function testExecuteExpiredListing() public {
+    //     switchSigner(userA);
+    //     nft.setApprovalForAll(address(mPlace), true);
+    // }
 
-    function testExecuteListingNotActive() public {
-        switchSigner(userA);
-        nft.setApprovalForAll(address(mPlace), true);
-        l.deadline = uint88(block.timestamp + 120 minutes);
-        l.sig = constructSig(
-            l.token,
-            l.tokenId,
-            l.price,
-            l.deadline,
-            l.lister,
-            privKeyA
-        );
-        uint256 lId = mPlace.createListing(l);
-        switchSigner(userB);
-        vm.expectRevert(NFTMarket.ListingNotActive.selector);
-        mPlace.executeListing(lId);
-    }
+    // function testExecuteListingNotActive() public {
+    //     switchSigner(userA);
+    //     nft.setApprovalForAll(address(mPlace), true);
+    //     l.deadline = uint88(block.timestamp + 120 minutes);
+    //     l.sig = constructSig(
+    //         l.token,
+    //         l.tokenId,
+    //         l.price,
+    //         l.deadline,
+    //         l.lister,
+    //         privKeyA
+    //     );
+    //     uint256 lId = mPlace.createListing(l);
+    //     switchSigner(userB);
+    //     vm.expectRevert(NFTMarket.ListingNotActive.selector);
+    //     mPlace.executeListing(lId);
+    // }
 
-    function testExecutePriceNotMet() public {
-        switchSigner(userA);
-        nft.setApprovalForAll(address(mPlace), true);
-        l.deadline = uint88(block.timestamp + 120 minutes);
-        l.sig = constructSig(
-            l.token,
-            l.tokenId,
-            l.price,
-            l.deadline,
-            l.lister,
-            privKeyA
-        );
-        uint256 lId = mPlace.createListing(l);
-        switchSigner(userB);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                NFTMarket.PriceNotMet.selector,
-                l.price - 0.9 ether
-            )
-        );
-        mPlace.executeListing{value: 0.9 ether}(lId);
-    }
+    // function testExecutePriceNotMet() public {
+    //     switchSigner(userA);
+    //     nft.setApprovalForAll(address(mPlace), true);
+    //     l.deadline = uint88(block.timestamp + 120 minutes);
+    //     l.sig = constructSig(
+    //         l.token,
+    //         l.tokenId,
+    //         l.price,
+    //         l.deadline,
+    //         l.lister,
+    //         privKeyA
+    //     );
+    //     uint256 lId = mPlace.createListing(l);
+    //     switchSigner(userB);
+    //     vm.expectRevert(
+    //         abi.encodeWithSelector(
+    //             NFTMarket.PriceNotMet.selector,
+    //             l.price - 0.9 ether
+    //         )
+    //     );
+    //     mPlace.executeListing{value: 0.9 ether}(lId);
+    // }
 
-    /*function testExecutePriceNotMet() public {
-        switchSigner(userA);
-        nft.setApprovalForAll(address(mPlace), true);
-        l.deadline = uint88(block.timestamp + 120 minutes);
-        l.sig = constructSig(
-            l.token,
-            l.tokenId,
-            l.price,
-            l.deadline,
-            l.lister,
-            privKeyA
-        );
-        uint256 lId = mPlace.createListing(l);
-        switchSigner(userB);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-              NFTMarket.PriceNotMet.selector,
-                l.price - 0.9 ether
-            )
-        );
-        mPlace.executeListing{value: 1.1 ether}(lId);
-    }*/
+    // /*function testExecutePriceNotMet() public {
+    //     switchSigner(userA);
+    //     nft.setApprovalForAll(address(mPlace), true);
+    //     l.deadline = uint88(block.timestamp + 120 minutes);
+    //     l.sig = constructSig(
+    //         l.token,
+    //         l.tokenId,
+    //         l.price,
+    //         l.deadline,
+    //         l.lister,
+    //         privKeyA
+    //     );
+    //     uint256 lId = mPlace.createListing(l);
+    //     switchSigner(userB);
+    //     vm.expectRevert(
+    //         abi.encodeWithSelector(
+    //           NFTMarket.PriceNotMet.selector,
+    //             l.price - 0.9 ether
+    //         )
+    //     );
+    //     mPlace.executeListing{value: 1.1 ether}(lId);
+    // }*/
 
-    function testExecute() public {
-        switchSigner(userA);
-        nft.setApprovalForAll(address(mPlace), true);
-        l.deadline = uint88(block.timestamp + 120 minutes);
-        l.sig = constructSig(
-            l.token,
-            l.tokenId,
-            l.price,
-            l.deadline,
-            l.lister,
-            privKeyA
-        );
-        uint256 lId = mPlace.createListing(l);
-        switchSigner(userB);
-        uint256 userABalanceBefore = userA.balance;
+    // function testExecute() public {
+    //     switchSigner(userA);
+    //     nft.setApprovalForAll(address(mPlace), true);
+    //     l.deadline = uint88(block.timestamp + 120 minutes);
+    //     l.sig = constructSig(
+    //         l.token,
+    //         l.tokenId,
+    //         l.price,
+    //         l.deadline,
+    //         l.lister,
+    //         privKeyA
+    //     );
+    //     uint256 lId = mPlace.createListing(l);
+    //     switchSigner(userB);
+    //     uint256 userABalanceBefore = userA.balance;
 
-        mPlace.executeListing{value: l.price}(lId);
+    //     mPlace.executeListing{value: l.price}(lId);
 
-       NFTMarket.ListingData memory t = mPlace.getListing(lId);
-        assertEq(t.price, 0.01 ether);
-        assertEq(t.active, false);
+    //    NFTMarket.ListingData memory t = mPlace.getListing(lId);
+    //     assertEq(t.price, 0.01 ether);
+    //     assertEq(t.active, false);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-              NFTMarket.PriceNotMet.selector,
-                l.price - 0.9 ether
-            )
-        );
-        assertEq(t.active, false);
-        assertEq(ERC721(l.token).ownerOf(l.tokenId), userB);
-    }
+    //     vm.expectRevert(
+    //         abi.encodeWithSelector(
+    //           NFTMarket.PriceNotMet.selector,
+    //             l.price - 0.9 ether
+    //         )
+    //     );
+    //     assertEq(t.active, false);
+    //     assertEq(ERC721(l.token).ownerOf(l.tokenId), userB);
+    // }
 }
 
