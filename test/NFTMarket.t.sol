@@ -48,26 +48,26 @@ contract NFTMarketTest is Helpers {
         mPlace.createCustomListing(l);
     }
 
-    // function testNonApprovedNFT() public {
-    //     switchSigner(userA);
-    //     vm.expectRevert(NFTMarket.NotApproved.selector);
-    //     mPlace.createListing(l);
-    // }
+    function testNonApproved() public {
+        switchSigner(userA);
+        vm.expectRevert(NFTMarket.NotApproved.selector);
+        mPlace.createCustomListing(l);
+    }
 
-    // function testMinPrice() public {
-    //     switchSigner(userA);
-    //     nft.setApprovalForAll(address(mPlace), true);
-    //     l.price = 0;
-    //     vm.expectRevert(NFTMarket.MinPriceTooLow.selector);
-    //     mPlace.createListing(l);
-    // }
+    function testMinPriceTooLow() public {
+        switchSigner(userA);
+        nft.setApprovalForAll(address(mPlace), true);
+        l. priceInWei = 0.5e18;
+        vm.expectRevert(NFTMarket.MinPriceTooLow.selector);
+        mPlace.createCustomListing(l);
+    }
 
-    // function testMinDeadline() public {
-    //     switchSigner(userA);
-    //     nft.setApprovalForAll(address(mPlace), true);
-    //     vm.expectRevert(NFTMarket.DeadlineTooSoon.selector);
-    //     mPlace.createListing(l);
-    // }
+    function testMinDurationNotMet() public {
+        switchSigner(userA);
+        nft.setApprovalForAll(address(mPlace), true);
+        vm.expectRevert(NFTMarket. MinDurationNotMet.selector);
+        mPlace.createCustomListing(l);
+    }
 
     // function testNotMetDuration() public {
     //     switchSigner(userA);
@@ -75,26 +75,27 @@ contract NFTMarketTest is Helpers {
     //     l.deadline = uint88(block.timestamp + 59 minutes);
     //     vm.expectRevert(NFTMarket.MinDurationNotMet.selector);
     //     mPlace.createListing(l);
-    // }
-
-    function testValidSignature() public {
-        switchSigner(userA);
-        nft.setApprovalForAll(address(mPlace), true);
-        l.expiryTime = uint88(block.timestamp + 120 minutes);
-        l. signature = constructSig(
-            l.tokenAddress,
-            l.tokenId,
-            l. priceInWei,
-            l.expiryTime,
-            l.listerAddress,
-            privKeyB
-        );
-        vm.expectRevert(NFTMarket.InvalidSignature.selector);
-        mPlace. createCustomListing(l);
     }
 
+    // function testValidSignature() {
+    //     switchSigner(userA);
+    //     nft.setApprovalForAll(address(mPlace), true);
+    //     l.expiryTime = uint88(block.timestamp + 120 minutes);
+    //     l. signature = constructSig(
+    //         l.tokenAddress,
+    //         l.tokenId,
+    //         l. priceInWei,
+    //         l.expiryTime,
+    //         l.listerAddress,
+    //         privKeyB
+    //     );
+    //     vm.expectRevert(NFTMarket.InvalidSignature.selector);
+    //     mPlace. createCustomListing(l);
+    // }
+    
+
     // // EDIT LISTING
-    // function testEditNonValidListing() public {
+    // function testListingNotExistent() public {
     //     switchSigner(userA);
     //     vm.expectRevert(NFTMarket.ListingNotExistent.selector);
     //     mPlace.editListing(1, 0, false);
@@ -245,5 +246,5 @@ contract NFTMarketTest is Helpers {
     //     assertEq(t.active, false);
     //     assertEq(ERC721(l.token).ownerOf(l.tokenId), userB);
     // }
-}
+// }
 
