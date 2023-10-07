@@ -44,7 +44,7 @@ contract NFTMarket {
 
     function createCustomListing(ListingData calldata listing) public returns (uint256 listingId) {
         if (ERC721(listing.tokenAddress).ownerOf(listing.tokenId) != msg.sender)
-            revert NotApproved();
+            revert NotOwner();
         if (!ERC721(listing.tokenAddress).isApprovedForAll(msg.sender, address(this)))
             revert NotApproved();
         if (listing.priceInWei < 0.01 ether) revert MinPriceTooLow();
@@ -54,7 +54,7 @@ contract NFTMarket {
 
         // Assert signature
         if (
-            SignUtils.isValid(
+            !SignUtils.isValid(
                 SignUtils.constructMessageHash(
                     listing.tokenAddress,
                     listing.tokenId,
